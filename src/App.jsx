@@ -10,7 +10,7 @@ const ESTADOS=["cotizacion","confirmado","produccion","listo","entregado"];
 const ESTADOS_LABEL=["💬 Cotización","✅ Confirmado","🔧 En producción","🎁 Listo","📬 Entregado"];
 const ESTADOS_COLOR=["#c084fc","#60a5fa","#fbbf24","#f4956a","#52c4a0"];
 const MESES_L=["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const NAV=[{id:"dashboard",label:"Dashboard",icon:"📊"},{id:"pedidos",label:"Pedidos",icon:"📦"},{id:"clientes",label:"Clientes",icon:"👥"},{id:"materiales",label:"Materiales",icon:"🎨"},{id:"finanzas",label:"Finanzas",icon:"💰"}];
+const NAV=[{id:"dashboard",label:"Dashboard",icon:"📊"},{id:"pedidos",label:"Pedidos",icon:"📦"},{id:"clientes",label:"Clientes",icon:"👥"},{id:"cotizador",label:"Cotizador",icon:"🧮"},{id:"materiales",label:"Materiales",icon:"🎨"},{id:"finanzas",label:"Finanzas",icon:"💰"}];
 
 const css=`
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -117,6 +117,84 @@ const Toast=({toast,onClose})=>{
   return(<div className="toast"><span style={{color,fontWeight:700}}>{toast.type==="error"?"✕":toast.type==="warn"?"⚠":"✓"}</span><span>{toast.message}</span><button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:C.mu,cursor:"pointer"}}>✕</button></div>);
 };
 
+// ── FORM ITEMS (bug de input corregido) ──
+function FormItems({items,setItems,tipos}){
+  const addItem=()=>setItems(p=>[...p,{tipo_caja:"",medidas:"",cantidad:1,unidad:"docena",decoracion:"",precio_unitario:""}]);
+  const delItem=(i)=>setItems(p=>p.filter((_,idx)=>idx!==i));
+  const upd=(i,f,v)=>setItems(p=>p.map((it,idx)=>idx===i?{...it,[f]:v}:it));
+
+  const calcPrecio=(nombreTipo)=>{
+    const t=tipos?.find(x=>x.nombre===nombreTipo);
+    if(!t)return"";
+    const cb=t.bases_por_resma>0?t.costo_triplex/t.bases_por_resma:0;
+    const ct=t.tapas_por_resma>0?t.costo_duplex/t.tapas_por_resma:0;
+    const costo=12*(cb+ct)+Number(t.costo_silicon)+Number(t.costo_bolsa)+Number(t.costo_sticker);
+    return(costo*Number(t.margen)).toFixed(2);
+  };
+
+  return(
+    <div style={{marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <p style={{fontSize:11,color:C.mu,textTransform:"uppercase",letterSpacing:"0.6px"}}>Cajas del pedido</p>
+        <button className="btn btn-ghost btn-sm" type="button" onClick={addItem}>+ Agregar caja</button>
+      </div>
+      {items.map((it,i)=>(
+        <ItemRow key={i} item={it} index={i} onUpd={upd} onDel={delItem} showDel={items.length>1} tipos={tipos} calcPrecio={calcPrecio}/>
+      ))}
+    </div>
+  );
+}
+
+// Componente separado para cada fila — evita el bug de re-render
+function ItemRow({item,index,onUpd,onDel,showDel,tipos,calcPrecio}){
+  return(
+    <div style={{background:"#0f0a0d",borderRadius:8,padding:12,marginBottom:8,border:"1px solid #3d2535"}}>
+      <div className="g2" style={{marginBottom:8}}>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Tipo de caja</label>
+          {tipos&&tipos.length>0?(
+            <select className="form-input" value={item.tipo_caja} onChange={e=>{
+              const v=e.target.value;
+              onUpd(index,"tipo_caja",v);
+              const precio=calcPrecio(v);
+              if(precio)onUpd(index,"precio_unitario",precio);
+            }}>
+              <option value="">Personalizado...</option>
+              {tipos.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+            </select>
+          ):(
+            <input className="form-input" value={item.tipo_caja} onChange={e=>onUpd(index,"tipo_caja",e.target.value)} placeholder="Cuadrada, circular..."/>
+          )}
+        </div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Medidas (cm)</label>
+          <input className="form-input" value={item.medidas} onChange={e=>onUpd(index,"medidas",e.target.value)} placeholder="15×18×5"/>
+        </div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Cantidad</label>
+          <input className="form-input" type="number" value={item.cantidad} onChange={e=>onUpd(index,"cantidad",e.target.value)}/>
+        </div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Unidad</label>
+          <select className="form-input" value={item.unidad} onChange={e=>onUpd(index,"unidad",e.target.value)}>
+            <option value="docena">Docena</option>
+            <option value="unidad">Unidad</option>
+          </select>
+        </div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Precio (Bs.)</label>
+          <input className="form-input" type="number" value={item.precio_unitario} onChange={e=>onUpd(index,"precio_unitario",e.target.value)}/>
+        </div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">Decoración</label>
+          <input className="form-input" value={item.decoracion} onChange={e=>onUpd(index,"decoracion",e.target.value)} placeholder="Vinilo, cinta razo..."/>
+        </div>
+      </div>
+      {showDel&&<button className="btn btn-danger btn-sm" type="button" onClick={()=>onDel(index)}>Quitar</button>}
+    </div>
+  );
+}
+
 function Dashboard({pedidos,clientes,materiales,gastos}){
   const now=new Date(),mes=now.getMonth()+1,anio=now.getFullYear();
   const activos=pedidos.filter(p=>p.estado!=="entregado"&&p.estado!=="cotizacion");
@@ -172,7 +250,7 @@ function Dashboard({pedidos,clientes,materiales,gastos}){
   );
 }
 
-function Pedidos({pedidos,clientes,reload,showToast}){
+function Pedidos({pedidos,clientes,tipos,reload,showToast}){
   const [tab,setTab]=useState("activos");
   const [modal,setModal]=useState(null);
   const [detalle,setDetalle]=useState(null);
@@ -190,10 +268,6 @@ function Pedidos({pedidos,clientes,reload,showToast}){
     if(!detalle)return;
     supabase.from("pedido_items").select("*").eq("pedido_id",detalle.id).then(({data})=>setDetalleItems(data||[]));
   },[detalle]);
-
-  const addItem=()=>setItems(p=>[...p,{tipo_caja:"",medidas:"",cantidad:1,unidad:"docena",decoracion:"",precio_unitario:""}]);
-  const updItem=(i,f,v)=>setItems(p=>p.map((it,idx)=>idx===i?{...it,[f]:v}:it));
-  const delItem=(i)=>setItems(p=>p.filter((_,idx)=>idx!==i));
 
   const openNuevo=()=>{
     setFp({cliente_id:"",fecha_pedido:hoy(),fecha_entrega:"",estado:"confirmado",precio_total:"",anticipo:"",saldo_cobrado:false,canal_origen:"WhatsApp",notas:""});
@@ -247,28 +321,6 @@ function Pedidos({pedidos,clientes,reload,showToast}){
       </div>
     );
   };
-
-  const FormItems=()=>(
-    <div style={{marginBottom:16}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <p style={{fontSize:11,color:C.mu,textTransform:"uppercase",letterSpacing:"0.6px"}}>Cajas del pedido</p>
-        <button className="btn btn-ghost btn-sm" onClick={addItem}>+ Agregar caja</button>
-      </div>
-      {items.map((it,i)=>(
-        <div key={i} style={{background:C.bg,borderRadius:8,padding:12,marginBottom:8}}>
-          <div className="g2" style={{marginBottom:8}}>
-            <div className="form-group" style={{marginBottom:0}}><label className="form-label">Tipo</label><input className="form-input" value={it.tipo_caja} onChange={e=>updItem(i,"tipo_caja",e.target.value)} placeholder="Cuadrada, circular..."/></div>
-            <div className="form-group" style={{marginBottom:0}}><label className="form-label">Medidas (cm)</label><input className="form-input" value={it.medidas} onChange={e=>updItem(i,"medidas",e.target.value)} placeholder="15×18×5"/></div>
-            <div className="form-group" style={{marginBottom:0}}><label className="form-label">Cantidad</label><input className="form-input" type="number" value={it.cantidad} onChange={e=>updItem(i,"cantidad",e.target.value)}/></div>
-            <div className="form-group" style={{marginBottom:0}}><label className="form-label">Unidad</label><select className="form-input" value={it.unidad} onChange={e=>updItem(i,"unidad",e.target.value)}><option value="docena">Docena</option><option value="unidad">Unidad</option></select></div>
-            <div className="form-group" style={{marginBottom:0}}><label className="form-label">Precio (Bs.)</label><input className="form-input" type="number" value={it.precio_unitario} onChange={e=>updItem(i,"precio_unitario",e.target.value)}/></div>
-            <div className="form-group" style={{marginBottom:0}}><label className="form-label">Decoración</label><input className="form-input" value={it.decoracion} onChange={e=>updItem(i,"decoracion",e.target.value)} placeholder="Vinilo, cinta razo..."/></div>
-          </div>
-          {items.length>1&&<button className="btn btn-danger btn-sm" onClick={()=>delItem(i)}>Quitar</button>}
-        </div>
-      ))}
-    </div>
-  );
 
   return(
     <div>
@@ -336,7 +388,7 @@ function Pedidos({pedidos,clientes,reload,showToast}){
             <div className="form-group"><label className="form-label">Anticipo (Bs.)</label><input className="form-input" type="number" value={fp.anticipo} onChange={e=>setFp(p=>({...p,anticipo:e.target.value}))}/></div>
             <div className="form-group" style={{gridColumn:"1/-1"}}><label className="form-label">Notas</label><input className="form-input" value={fp.notas||""} onChange={e=>setFp(p=>({...p,notas:e.target.value}))} placeholder="Instrucciones especiales..."/></div>
           </div>
-          <FormItems/>
+          <FormItems items={items} setItems={setItems} tipos={tipos}/>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
             <button className="btn btn-secondary btn-sm" onClick={()=>setModal(null)}>Cancelar</button>
             <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar"}</button>
@@ -405,6 +457,139 @@ function Clientes({clientes,pedidos,reload,showToast}){
             <button className="btn btn-secondary btn-sm" onClick={()=>setModal(null)}>Cancelar</button>
             <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar"}</button>
           </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Cotizador({tipos,reload,showToast}){
+  const [modal,setModal]=useState(null);
+  const [confirm,setConfirm]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [sel,setSel]=useState("");
+  const [docenas,setDocenas]=useState(1);
+  const [ft,setFt]=useState({nombre:"",familia:"cuadrada",bases_por_resma:12,tapas_por_resma:15,costo_triplex:450,costo_duplex:325,costo_silicon:1,costo_bolsa:1,costo_sticker:2,margen:3.2});
+
+  const calcCosto=(t)=>{
+    const cb=Number(t.bases_por_resma)>0?Number(t.costo_triplex)/Number(t.bases_por_resma):0;
+    const ct=Number(t.tapas_por_resma)>0?Number(t.costo_duplex)/Number(t.tapas_por_resma):0;
+    return 12*(cb+ct)+Number(t.costo_silicon)+Number(t.costo_bolsa)+Number(t.costo_sticker);
+  };
+
+  const save=async()=>{
+    if(!ft.nombre)return showToast("Completá el nombre","error");
+    setSaving(true);
+    const data={...ft,bases_por_resma:Number(ft.bases_por_resma),tapas_por_resma:Number(ft.tapas_por_resma),costo_triplex:Number(ft.costo_triplex),costo_duplex:Number(ft.costo_duplex),costo_silicon:Number(ft.costo_silicon),costo_bolsa:Number(ft.costo_bolsa),costo_sticker:Number(ft.costo_sticker),margen:Number(ft.margen)};
+    if(modal==="nuevo")await supabase.from("tipos_caja").insert([data]);
+    else await supabase.from("tipos_caja").update(data).eq("id",ft.id);
+    setModal(null);reload();showToast("Guardado");setSaving(false);
+  };
+  const eliminar=async()=>{await supabase.from("tipos_caja").delete().eq("id",confirm);setConfirm(null);reload();showToast("Eliminado");};
+
+  const tipoSel=sel?tipos.find(t=>t.nombre===sel):tipos[0];
+  const costo=tipoSel?calcCosto(tipoSel):0;
+  const precioDoc=tipoSel?costo*Number(tipoSel.margen):0;
+  const precioCaja=precioDoc/12;
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div><p className="section-title">🧮 Cotizador</p><p className="section-sub">Tipos de caja y parámetros editables</p></div>
+        <button className="btn btn-primary btn-sm" onClick={()=>{setFt({nombre:"",familia:"cuadrada",bases_por_resma:12,tapas_por_resma:15,costo_triplex:450,costo_duplex:325,costo_silicon:1,costo_bolsa:1,costo_sticker:2,margen:3.2});setModal("nuevo");}}>+ Nuevo tipo</button>
+      </div>
+
+      {tipos.length>0&&(
+        <div className="card" style={{marginBottom:16}}>
+          <p style={{fontSize:13,fontWeight:600,color:C.wh,marginBottom:14}}>Calculadora rápida</p>
+          <div className="form-group">
+            <label className="form-label">Tipo de caja</label>
+            <select className="form-input" value={sel||tipos[0]?.nombre||""} onChange={e=>setSel(e.target.value)}>
+              {tipos.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+            </select>
+          </div>
+          {tipoSel&&(
+            <>
+              <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:13,color:C.mu,display:"flex",gap:20,flexWrap:"wrap"}}>
+                <span>Costo/docena: <strong style={{color:C.wh}}>Bs. {costo.toFixed(2)}</strong></span>
+                <span>Margen: <strong style={{color:C.ac}}>{tipoSel.margen}x</strong></span>
+                <span>Precio/caja: <strong style={{color:C.wh}}>Bs. {precioCaja.toFixed(2)}</strong></span>
+              </div>
+              <div className="g2">
+                <div className="card-sm">
+                  <p style={{fontSize:11,color:C.mu,marginBottom:8}}>COTIZACIÓN POR DOCENAS</p>
+                  <input className="form-input" type="number" min="1" value={docenas} onChange={e=>setDocenas(Number(e.target.value)||1)} style={{marginBottom:10}}/>
+                  <p style={{fontSize:11,color:C.mu,marginBottom:4}}>Precio de venta</p>
+                  <p style={{fontSize:28,fontWeight:800,color:C.ac,fontFamily:"'Syne',sans-serif"}}>Bs. {(precioDoc*docenas).toFixed(2)}</p>
+                  <p style={{fontSize:11,color:C.mu,marginTop:4}}>{docenas} doc = {docenas*12} cajas</p>
+                </div>
+                <div className="card-sm">
+                  <p style={{fontSize:11,color:C.mu,marginBottom:8}}>PRECIO POR UNIDAD</p>
+                  <p style={{fontSize:28,fontWeight:800,color:C.pu,fontFamily:"'Syne',sans-serif",marginTop:10}}>Bs. {precioCaja.toFixed(2)}</p>
+                  <p style={{fontSize:11,color:C.mu,marginTop:4}}>por caja individual</p>
+                  <p style={{fontSize:13,color:C.mu,marginTop:12}}>Costo real: Bs. {(costo/12).toFixed(2)}/u</p>
+                  <p style={{fontSize:13,color:C.mu}}>Ganancia: Bs. {(precioCaja-costo/12).toFixed(2)}/u</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {tipos.length===0&&<div className="card" style={{textAlign:"center",padding:40,color:C.mu}}>Sin tipos de caja. Creá el primero con + Nuevo tipo.</div>}
+        {tipos.map(t=>{
+          const c=calcCosto(t);
+          const pd=c*Number(t.margen);
+          return(
+            <div key={t.id} style={{background:C.card,border:`1px solid ${C.cb}`,borderRadius:12,padding:"14px 18px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div><p style={{fontSize:14,fontWeight:600,color:C.wh}}>{t.nombre}</p><p style={{fontSize:11,color:C.mu}}>{t.familia}</p></div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{fontSize:12,background:"rgba(232,96,122,0.1)",color:C.ac,padding:"3px 10px",borderRadius:20,fontWeight:600}}>Bs. {pd.toFixed(2)}/doc</span>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>{setFt({...t});setModal("editar");}}>✏ Editar</button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>setConfirm(t.id)}>✕</button>
+                </div>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:12,fontSize:12,color:C.mu}}>
+                <span>Bases/resma: <strong style={{color:C.tx}}>{t.bases_por_resma}</strong></span>
+                <span>Tapas/resma: <strong style={{color:C.tx}}>{t.tapas_por_resma}</strong></span>
+                <span>Triplex: <strong style={{color:C.tx}}>Bs. {t.costo_triplex}</strong></span>
+                <span>Duplex: <strong style={{color:C.tx}}>Bs. {t.costo_duplex}</strong></span>
+                <span>Silicón: <strong style={{color:C.tx}}>Bs. {t.costo_silicon}</strong></span>
+                <span>Bolsa: <strong style={{color:C.tx}}>Bs. {t.costo_bolsa}</strong></span>
+                <span>Sticker: <strong style={{color:C.tx}}>Bs. {t.costo_sticker}</strong></span>
+                <span>Margen: <strong style={{color:C.ac}}>{t.margen}x</strong></span>
+                <span>Costo/doc: <strong style={{color:C.tx}}>Bs. {c.toFixed(2)}</strong></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {confirm&&<Confirm msg="¿Eliminar este tipo de caja?" onOk={eliminar} onCancel={()=>setConfirm(null)}/>}
+
+      {(modal==="nuevo"||modal==="editar")&&(
+        <Modal title={modal==="nuevo"?"Nuevo tipo de caja":"Editar tipo de caja"} onClose={()=>setModal(null)}>
+          <div className="form-group"><label className="form-label">Nombre *</label><input className="form-input" value={ft.nombre} onChange={e=>setFt(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Cuadrada mediana"/></div>
+          <div className="form-group"><label className="form-label">Familia</label><select className="form-input" value={ft.familia} onChange={e=>setFt(p=>({...p,familia:e.target.value}))}>{["cuadrada","rectangular","circular","base","especial"].map(v=><option key={v} value={v}>{v}</option>)}</select></div>
+          <p style={{fontSize:11,color:C.mu,marginBottom:8,marginTop:4,textTransform:"uppercase",letterSpacing:"0.6px"}}>Parámetros de materiales</p>
+          <div className="g2">
+            <div className="form-group"><label className="form-label">Bases por resma</label><input className="form-input" type="number" value={ft.bases_por_resma} onChange={e=>setFt(p=>({...p,bases_por_resma:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Tapas por resma</label><input className="form-input" type="number" value={ft.tapas_por_resma} onChange={e=>setFt(p=>({...p,tapas_por_resma:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Costo Triplex (Bs.)</label><input className="form-input" type="number" value={ft.costo_triplex} onChange={e=>setFt(p=>({...p,costo_triplex:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Costo Duplex (Bs.)</label><input className="form-input" type="number" value={ft.costo_duplex} onChange={e=>setFt(p=>({...p,costo_duplex:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Silicón/doc (Bs.)</label><input className="form-input" type="number" value={ft.costo_silicon} onChange={e=>setFt(p=>({...p,costo_silicon:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Bolsa/doc (Bs.)</label><input className="form-input" type="number" value={ft.costo_bolsa} onChange={e=>setFt(p=>({...p,costo_bolsa:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Sticker/doc (Bs.)</label><input className="form-input" type="number" value={ft.costo_sticker} onChange={e=>setFt(p=>({...p,costo_sticker:e.target.value}))}/></div>
+            <div className="form-group"><label className="form-label">Margen (x)</label><input className="form-input" type="number" step="0.1" value={ft.margen} onChange={e=>setFt(p=>({...p,margen:e.target.value}))}/></div>
+          </div>
+          {ft.bases_por_resma&&ft.costo_triplex&&(
+            <div style={{background:C.bg,borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:13,color:C.mu}}>
+              Preview: Costo/doc = <strong style={{color:C.wh}}>Bs. {calcCosto(ft).toFixed(2)}</strong> · Precio/doc = <strong style={{color:C.ac}}>Bs. {(calcCosto(ft)*Number(ft.margen||1)).toFixed(2)}</strong>
+            </div>
+          )}
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><button className="btn btn-secondary btn-sm" onClick={()=>setModal(null)}>Cancelar</button><button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar"}</button></div>
         </Modal>
       )}
     </div>
@@ -615,12 +800,18 @@ export default function App(){
   const [loading,setLoading]=useState(true);
   const [tab,setTab]=useState("dashboard");
   const [toast,setToast]=useState(null);
-  const [data,setData]=useState({pedidos:[],clientes:[],materiales:[],gastos:[]});
+  const [data,setData]=useState({pedidos:[],clientes:[],materiales:[],gastos:[],tipos:[]});
   const showToast=(message,type="success")=>{setToast({message,type});setTimeout(()=>setToast(null),3000);};
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setSession(session);setLoading(false);});supabase.auth.onAuthStateChange((_,s)=>setSession(s));},[]);
   const load=async()=>{
-    const[p,c,m,g]=await Promise.all([supabase.from("pedidos").select("*").order("fecha_entrega"),supabase.from("clientes").select("*").order("nombre"),supabase.from("materiales").select("*").order("nombre"),supabase.from("gastos").select("*").order("fecha").limit(1000)]);
-    setData({pedidos:p.data||[],clientes:c.data||[],materiales:m.data||[],gastos:g.data||[]});
+    const[p,c,m,g,t]=await Promise.all([
+      supabase.from("pedidos").select("*").order("fecha_entrega"),
+      supabase.from("clientes").select("*").order("nombre"),
+      supabase.from("materiales").select("*").order("nombre"),
+      supabase.from("gastos").select("*").order("fecha").limit(1000),
+      supabase.from("tipos_caja").select("*").order("nombre"),
+    ]);
+    setData({pedidos:p.data||[],clientes:c.data||[],materiales:m.data||[],gastos:g.data||[],tipos:t.data||[]});
   };
   useEffect(()=>{if(session)load();},[session]);
   if(loading)return(<div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:C.bg,gap:16}}><div style={{fontSize:40}}>📦</div><p style={{color:C.mu,fontSize:13}}>Cargando Pack'in...</p></div>);
@@ -645,8 +836,9 @@ export default function App(){
             </div>
             <div className="main-content">
               {tab==="dashboard"&&<Dashboard pedidos={data.pedidos} clientes={data.clientes} materiales={data.materiales} gastos={data.gastos}/>}
-              {tab==="pedidos"&&<Pedidos pedidos={data.pedidos} clientes={data.clientes} reload={load} showToast={showToast}/>}
+              {tab==="pedidos"&&<Pedidos pedidos={data.pedidos} clientes={data.clientes} tipos={data.tipos} reload={load} showToast={showToast}/>}
               {tab==="clientes"&&<Clientes clientes={data.clientes} pedidos={data.pedidos} reload={load} showToast={showToast}/>}
+              {tab==="cotizador"&&<Cotizador tipos={data.tipos} reload={load} showToast={showToast}/>}
               {tab==="materiales"&&<Materiales materiales={data.materiales} reload={load} showToast={showToast}/>}
               {tab==="finanzas"&&<Finanzas pedidos={data.pedidos} gastos={data.gastos} reload={load} showToast={showToast}/>}
             </div>
